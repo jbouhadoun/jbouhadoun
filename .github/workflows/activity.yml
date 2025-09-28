@@ -1,4 +1,3 @@
-name: Update Dashboard Profile
 on:
   push:
     branches: [ main ]
@@ -18,10 +17,97 @@ jobs:
       - name: Analyze GitHub Activity
         id: analysis
         run: |
-          echo "🔍 Analyse des contributions sur les organisations publiques..."
+          echo "🔍 Analyse complète des contributions (personnel + organisations)..."
           
           # Organisations à analyser
           orgs="BaseAdresseNationale betagouv IGNF"
+          
+          # Compteurs pour les langages
+          declare -A language_count
+          declare -A language_bytes
+          
+          echo "📊 Analyse des langages - repos personnels..."
+          # Récupérer langages depuis repos personnels
+          personal_repos=$(curl -s "https://api.github.com/users/jbouhadoun/repos?per_page=100")
+          
+          if [ "$(echo "$personal_repos" | jq 'type')" = '"array"' ]; then
+            echo "$personal_repos" | jq -r '.[] | select(.language != null) | .name' | while read repo; do
+              if [ ! -z "$repo" ]; then
+                lang_data=$(curl -s "https://api.github.com/repos/jbouhadoun/$repo/languages")
+                echo "$lang_data" | jq -r 'to_entries[] | "\(.key) \(.value)"' | while read lang bytes; do
+                  echo "$lang:$bytes" >> personal_langs.tmp
+                done
+                sleep 0.1
+              fi
+            done
+          fi
+          
+          echo "📊 Analyse des langages - organisations publiques..."
+          # Récupérer langages depuis les organisations où vous contribuez
+          for org in $orgs; do
+            echo "  Analyse $org..."
+            
+            # Récupérer les repos de l'organisation
+            org_repos=$(curl -s "https://api.github.com/orgs/$org/repos?per_page=50")
+            
+            if [ "$(echo "$org_repos" | jq 'type')" = '"array"' ]; then
+              # Pour chaque repo, vérifier si vous avez contribué
+              echo "$org_repos" | jq -r '.[] | .name' | while read repo; do
+                if [ ! -z "$repo" ]; then
+                  # Vérifier vos contributions sur ce repo
+                  contributions=$(curl -s "https://api.github.com/repos/$org/$repo/contributors" | jq -r '.[] | select(.login == "jbouhadoun") | .contributions' 2>/dev/null)
+                  
+                  if [ ! -z "$contributions" ] && [ "$contributions" != "null" ] && [ "$contributions" -gt 0 ]; then
+                    echo "    ✅ Contributions trouvées dans $org/$repo ($contributions commits)"
+                    # Récupérer les langages de ce repo
+                    lang_data=$(curl -s "https://api.github.com/repos/$org/$repo/languages")
+                    echo "$lang_data" | jq -r 'to_entries[] | "\(.key) \(.value)"' | while read lang bytes; do
+                      # Pondérer par le pourcentage de vos contributions (estimation)
+                      weighted_bytes=$((bytes * contributions / 100))
+                      echo "$lang:$weighted_bytes" >> org_langs.tmp
+                    done
+                  fi
+                  sleep 0.2
+                fi
+              done
+            fi
+            sleep 1
+          done
+          
+          # Combiner et calculer les totaux
+          echo "🔢 Calcul des statistiques combinées..."
+          
+          # Traiter les fichiers temporaires
+          touch personal_langs.tmp org_langs.tmp
+          
+          # Combiner tous les langages
+          cat personal_langs.tmp org_langs.tmp | awk -F: '
+          {
+            lang=$1
+            bytes=$2
+            if (bytes == "") bytes=0
+            total[lang] += bytes
+          }
+          END {
+            for (lang in total) {
+              if (total[lang] > 0) {
+                print lang ":" total[lang]
+              }
+            }
+          }' | sort -t: -k2 -nr > combined_langs.tmp
+          
+          # Récupérer le top 8 des langages
+          top_languages=$(head -8 combined_langs.tmp | cut -d: -f1)
+          
+          # Calculer les pourcentages
+          total_bytes=$(awk -F: '{sum+=$2} END {print sum}' combined_langs.tmp)
+          language_stats=""
+          
+          for lang in $top_languages; do
+            bytes=$(grep "^$lang:" combined_langs.tmp | cut -d: -f2)
+            if [ ! -z "$bytes" ] && [ "$bytes" -gt 0 ]; then
+              percentage=$(awk "BEGIN {printf \"%.1f\", $bytes*100/$total_bytes}")
+              language_stats="$language_stats$lang $percentage%"
           
           # Récupérer les contributions récentes
           echo "📊 Recherche des contributions récentes..."
@@ -51,43 +137,25 @@ jobs:
             sleep 1
           done
           
-          # Récupérer les langages depuis toutes les organisations
-          echo "🔧 Analyse des technologies utilisées..."
-          all_languages=""
+          # Récupérer les contributions récentes (garder la logique existante)
+          echo "📊 Recherche des contributions récentes..."
+          recent_activity=""
+          total_contributions=0
           
-          # Langages depuis repos personnels
-          personal_repos=$(curl -s "https://api.github.com/users/jbouhadoun/repos")
-          personal_langs=$(echo "$personal_repos" | jq -r 'if type == "array" then .[] | .language | select(. != null) else empty end' 2>/dev/null | sort | uniq)
-          
-          # Langages depuis les organisations
           for org in $orgs; do
-            echo "  Langages dans $org..."
-            org_repos=$(curl -s "https://api.github.com/orgs/$org/repos?per_page=20")
-            org_langs=$(echo "$org_repos" | jq -r 'if type == "array" then .[] | .language | select(. != null) else empty end' 2>/dev/null | sort | uniq)
-            all_languages="$all_languages $org_langs"
-            sleep 0.5
-          done
-          
-          # Combiner tous les langages
-          unique_languages=$(echo "$personal_langs $all_languages" | tr ' ' '\n' | sort | uniq -c | sort -rn | head -8 | awk '{print $2}')
-          
-          echo "Langages détectés: $unique_languages"
-          
-          # Créer des badges avec style similaire au dashboard
-          tech_badges=""
-          for lang in $unique_languages; do
-            case $lang in
-              "JavaScript") tech_badges="$tech_badges<img src='https://img.shields.io/badge/JavaScript-323330?style=for-the-badge&logo=javascript&logoColor=F7DF1E' alt='JavaScript'/> " ;;
-              "TypeScript") tech_badges="$tech_badges<img src='https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white' alt='TypeScript'/> " ;;
-              "Python") tech_badges="$tech_badges<img src='https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white' alt='Python'/> " ;;
-              "Java") tech_badges="$tech_badges<img src='https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=java&logoColor=white' alt='Java'/> " ;;
-              "Go") tech_badges="$tech_badges<img src='https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white' alt='Go'/> " ;;
-              "PHP") tech_badges="$tech_badges<img src='https://img.shields.io/badge/PHP-777BB4?style=for-the-badge&logo=php&logoColor=white' alt='PHP'/> " ;;
-              "C++") tech_badges="$tech_badges<img src='https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=cplusplus&logoColor=white' alt='C++'/> " ;;
-              "Shell") tech_badges="$tech_badges<img src='https://img.shields.io/badge/Shell-121011?style=for-the-badge&logo=gnu-bash&logoColor=white' alt='Shell'/> " ;;
-              *) tech_badges="$tech_badges<img src='https://img.shields.io/badge/${lang}-grey?style=for-the-badge' alt='${lang}'/> " ;;
-            esac
-          done
+            echo "  Analyse de l'organisation: $org"
+            
+            # Rechercher les pull requests
+            prs=$(curl -s "https://api.github.com/search/issues?q=author:jbouhadoun+org:$org+type:pr&sort=updated&per_page=5")
+            
+            if [ "$(echo "$prs" | jq '.total_count // 0')" -gt 0 ]; then
+              org_prs=$(echo "$prs" | jq -r --arg org "$org" '
+                if .items and (.items | length > 0) then 
+                  .items[] | "- **[\(.repository_url | split("/")[-1])](https://github.com/\($org)/\(.repository_url | split("/")[-1]))**: \(.title)"
+                else empty end' 2>/dev/null)
+              
+              if [ ! -z "$org_prs" ]; then
+                recent_activity="$recent_activity"
           
           # Récupérer des projets représentatifs de chaque organisation
           echo "📁 Récupération des projets représentatifs..."
@@ -132,8 +200,7 @@ jobs:
         run: |
           cat > README.md << 'EOF'
           <div align="center">
-            <h1> Hello </h1>
-            <h3>Développeur • Service Public Numérique</h3>
+            <h1>Hello</h1>
           </div>
           
           ---
@@ -142,8 +209,11 @@ jobs:
           
           <div align="center">
             <img height="180em" src="https://github-readme-stats.vercel.app/api?username=jbouhadoun&show_icons=true&theme=github_dark&include_all_commits=true&count_private=false&hide_border=true&bg_color=0d1117"/>
-            <img height="180em" src="https://github-readme-stats.vercel.app/api/top-langs/?username=jbouhadoun&layout=compact&theme=github_dark&hide_border=true&bg_color=0d1117"/>
           </div>
+          
+          ### 📈 Langages Utilisés (Personnel + Organisations)
+          
+          ${{ steps.analysis.outputs.CUSTOM_LANG_DISPLAY }}
           
           <div align="center">
             <img src="https://github-readme-streak-stats.herokuapp.com/?user=jbouhadoun&theme=github-dark-blue&hide_border=true&background=0d1117" alt="GitHub Streak"/>
@@ -158,12 +228,6 @@ jobs:
           ${{ steps.analysis.outputs.TECH_BADGES }}
             
           </div>
-          
-          ---
-          
-          ## 🏛️ Contributions au Service Public
-          
-          ${{ steps.analysis.outputs.FEATURED_PROJECTS }}
           
           ---
           
@@ -215,4 +279,6 @@ jobs:
           git config user.email "github-actions@github.com"
           git add README.md
           git diff --staged --quiet || git commit -m "📊 Update dashboard profile with org contributions"
-          git push
+          git push\n'
+            fi
+          done
