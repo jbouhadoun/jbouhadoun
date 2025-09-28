@@ -1,0 +1,395 @@
+name: Update GitHub Profile
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    # Mise à jour automatique tous les jours à 6h du matin
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Generate Snake Game
+        uses: Platane/snk@v3
+        with:
+          github_user_name: jbouhadoun
+          outputs: |
+            dist/github-contribution-grid-snake.svg
+            dist/github-contribution-grid-snake-dark.svg?palette=github-dark
+            
+      - name: Generate GitHub Stats
+        uses: anuraghazra/github-readme-stats@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Get GitHub Languages and Frameworks
+        id: languages
+        run: |
+          # Récupérer les langages via l'API GitHub
+          languages=$(curl -s "https://api.github.com/users/jbouhadoun/repos" | \
+            jq -r '.[].language | select(. != null)' | \
+            sort | uniq -c | sort -rn | \
+            head -20 | \
+            awk '{print $2}')
+          
+          # Récupérer les frameworks depuis package.json des repos
+          repos=$(curl -s "https://api.github.com/users/jbouhadoun/repos" | jq -r '.[].name')
+          frameworks=""
+          
+          for repo in $repos; do
+            # Vérifier si package.json existe
+            package_json=$(curl -s "https://api.github.com/repos/jbouhadoun/$repo/contents/package.json" 2>/dev/null)
+            if echo "$package_json" | jq -e '.content' > /dev/null 2>&1; then
+              # Décoder le contenu base64
+              content=$(echo "$package_json" | jq -r '.content' | base64 -d 2>/dev/null)
+              if [ $? -eq 0 ]; then
+                # Extraire les dépendances
+                deps=$(echo "$content" | jq -r '.dependencies // {}, .devDependencies // {} | keys[]' 2>/dev/null)
+                
+                # Détecter les frameworks populaires
+                echo "$deps" | while read dep; do
+                  case "$dep" in
+                    "react") echo "React" ;;
+                    "next") echo "Next.js" ;;
+                    "vue") echo "Vue.js" ;;
+                    "nuxt") echo "Nuxt.js" ;;
+                    "angular") echo "Angular" ;;
+                    "@angular/core") echo "Angular" ;;
+                    "svelte") echo "Svelte" ;;
+                    "express") echo "Express.js" ;;
+                    "fastify") echo "Fastify" ;;
+                    "nestjs") echo "NestJS" ;;
+                    "@nestjs/core") echo "NestJS" ;;
+                    "django") echo "Django" ;;
+                    "flask") echo "Flask" ;;
+                    "spring-boot") echo "Spring Boot" ;;
+                    "laravel") echo "Laravel" ;;
+                    "symfony") echo "Symfony" ;;
+                    "rails") echo "Ruby on Rails" ;;
+                    "gatsby") echo "Gatsby" ;;
+                    "remix") echo "Remix" ;;
+                    "astro") echo "Astro" ;;
+                    "solid-js") echo "SolidJS" ;;
+                    "qwik") echo "Qwik" ;;
+                  esac
+                done
+              fi
+            fi
+          done | sort | uniq > frameworks_temp.txt
+          
+          frameworks=$(cat frameworks_temp.txt | tr '\n' ' ')
+          
+          # Combiner langages et frameworks
+          all_techs="$languages $frameworks"
+          
+          # Créer les badges automatiquement
+          badges=""
+          for tech in $all_techs; do
+            case $tech in
+              "React")
+                badges="$badges![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)"
+                ;;
+              "Next.js")
+                badges="$badges![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)"
+                ;;
+              "Vue.js")
+                badges="$badges![Vue.js](https://img.shields.io/badge/Vue.js-35495E?style=for-the-badge&logo=vue.js&logoColor=4FC08D)"
+                ;;
+              "Nuxt.js")
+                badges="$badges![Nuxt.js](https://img.shields.io/badge/Nuxt.js-00C58E?style=for-the-badge&logo=nuxtdotjs&logoColor=white)"
+                ;;
+              "Angular")
+                badges="$badges![Angular](https://img.shields.io/badge/Angular-DD0031?style=for-the-badge&logo=angular&logoColor=white)"
+                ;;
+              "Svelte")
+                badges="$badges![Svelte](https://img.shields.io/badge/Svelte-FF3E00?style=for-the-badge&logo=svelte&logoColor=white)"
+                ;;
+              "Express.js")
+                badges="$badges![Express.js](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge&logo=express&logoColor=white)"
+                ;;
+              "Fastify")
+                badges="$badges![Fastify](https://img.shields.io/badge/Fastify-000000?style=for-the-badge&logo=fastify&logoColor=white)"
+                ;;
+              "NestJS")
+                badges="$badges![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)"
+                ;;
+              "Django")
+                badges="$badges![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white)"
+                ;;
+              "Flask")
+                badges="$badges![Flask](https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white)"
+                ;;
+              "Spring Boot")
+                badges="$badges![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)"
+                ;;
+              "Laravel")
+                badges="$badges![Laravel](https://img.shields.io/badge/Laravel-FF2D20?style=for-the-badge&logo=laravel&logoColor=white)"
+                ;;
+              "Symfony")
+                badges="$badges![Symfony](https://img.shields.io/badge/Symfony-000000?style=for-the-badge&logo=symfony&logoColor=white)"
+                ;;
+              "Ruby on Rails")
+                badges="$badges![Rails](https://img.shields.io/badge/Rails-CC0000?style=for-the-badge&logo=ruby-on-rails&logoColor=white)"
+                ;;
+              "Gatsby")
+                badges="$badges![Gatsby](https://img.shields.io/badge/Gatsby-663399?style=for-the-badge&logo=gatsby&logoColor=white)"
+                ;;
+              "Remix")
+                badges="$badges![Remix](https://img.shields.io/badge/Remix-000000?style=for-the-badge&logo=remix&logoColor=white)"
+                ;;
+              "Astro")
+                badges="$badges![Astro](https://img.shields.io/badge/Astro-FF5D01?style=for-the-badge&logo=astro&logoColor=white)"
+                ;;
+              "SolidJS")
+                badges="$badges![SolidJS](https://img.shields.io/badge/SolidJS-2c4f7c?style=for-the-badge&logo=solid&logoColor=c8c9cb)"
+                ;;
+              "Qwik")
+                badges="$badges![Qwik](https://img.shields.io/badge/Qwik-18B6F6?style=for-the-badge&logo=qwik&logoColor=white)"
+                ;;
+              "JavaScript")
+                badges="$badges![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)"
+                ;;
+              "TypeScript")
+                badges="$badges![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)"
+                ;;
+              "Python")
+                badges="$badges![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)"
+                ;;
+              "Java")
+                badges="$badges![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=java&logoColor=white)"
+                ;;
+              "C++")
+                badges="$badges![C++](https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)"
+                ;;
+              "C")
+                badges="$badges![C](https://img.shields.io/badge/C-00599C?style=for-the-badge&logo=c&logoColor=white)"
+                ;;
+              "C#")
+                badges="$badges![C#](https://img.shields.io/badge/C%23-239120?style=for-the-badge&logo=c-sharp&logoColor=white)"
+                ;;
+              "PHP")
+                badges="$badges![PHP](https://img.shields.io/badge/PHP-777BB4?style=for-the-badge&logo=php&logoColor=white)"
+                ;;
+              "Ruby")
+                badges="$badges![Ruby](https://img.shields.io/badge/Ruby-CC342D?style=for-the-badge&logo=ruby&logoColor=white)"
+                ;;
+              "Go")
+                badges="$badges![Go](https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white)"
+                ;;
+              "Rust")
+                badges="$badges![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)"
+                ;;
+              "Swift")
+                badges="$badges![Swift](https://img.shields.io/badge/Swift-FA7343?style=for-the-badge&logo=swift&logoColor=white)"
+                ;;
+              "Kotlin")
+                badges="$badges![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=for-the-badge&logo=kotlin&logoColor=white)"
+                ;;
+              "Dart")
+                badges="$badges![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)"
+                ;;
+              "R")
+                badges="$badges![R](https://img.shields.io/badge/R-276DC3?style=for-the-badge&logo=r&logoColor=white)"
+                ;;
+              "Scala")
+                badges="$badges![Scala](https://img.shields.io/badge/Scala-DC322F?style=for-the-badge&logo=scala&logoColor=white)"
+                ;;
+              "HTML")
+                badges="$badges![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)"
+                ;;
+              "CSS")
+                badges="$badges![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)"
+                ;;
+              "SCSS")
+                badges="$badges![Sass](https://img.shields.io/badge/Sass-CC6699?style=for-the-badge&logo=sass&logoColor=white)"
+                ;;
+              "Less")
+                badges="$badges![Less](https://img.shields.io/badge/Less-2B4C80?style=for-the-badge&logo=less&logoColor=white)"
+                ;;
+              "Shell")
+                badges="$badges![Shell Script](https://img.shields.io/badge/Shell_Script-121011?style=for-the-badge&logo=gnu-bash&logoColor=white)"
+                ;;
+              "PowerShell")
+                badges="$badges![PowerShell](https://img.shields.io/badge/PowerShell-5391FE?style=for-the-badge&logo=powershell&logoColor=white)"
+                ;;
+              "Dockerfile")
+                badges="$badges![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)"
+                ;;
+              "YAML")
+                badges="$badges![YAML](https://img.shields.io/badge/YAML-000000?style=for-the-badge&logo=yaml&logoColor=white)"
+                ;;
+              "JSON")
+                badges="$badges![JSON](https://img.shields.io/badge/JSON-000000?style=for-the-badge&logo=json&logoColor=white)"
+                ;;
+              "Markdown")
+                badges="$badges![Markdown](https://img.shields.io/badge/Markdown-000000?style=for-the-badge&logo=markdown&logoColor=white)"
+                ;;
+              "Jupyter Notebook")
+                badges="$badges![Jupyter](https://img.shields.io/badge/Jupyter-F37626?style=for-the-badge&logo=jupyter&logoColor=white)"
+                ;;
+              *)
+                # Badge générique pour les langages non reconnus
+                tech_encoded=$(echo "$tech" | sed 's/ /%20/g' | sed 's/+/%2B/g' | sed 's/#/%23/g')
+                badges="$badges![${tech}](https://img.shields.io/badge/${tech_encoded}-lightgrey?style=for-the-badge)"
+                ;;
+            esac
+          done
+          
+          # Nettoyer le fichier temporaire
+          rm -f frameworks_temp.txt
+          
+          echo "LANGUAGE_BADGES<<EOF" >> $GITHUB_OUTPUT
+          echo "$badges" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update README
+        run: |
+          cat > README.md << 'EOF'
+          <div align="center">
+            <h1>👋 Salut, je suis Julien Bouhadoun</h1>
+            <p>
+              <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&pause=1000&color=2E9EF7&center=true&vCenter=true&width=435&lines=D%C3%A9veloppeur+Full+Stack;Passionn%C3%A9+par+la+technologie;Toujours+en+apprentissage" alt="Typing SVG" />
+            </p>
+          </div>
+
+          ## 📊 Mes Statistiques GitHub
+
+          <div align="center">
+            <img height="180em" src="https://github-readme-stats.vercel.app/api?username=jbouhadoun&show_icons=true&theme=tokyonight&include_all_commits=true&count_private=true"/>
+            <img height="180em" src="https://github-readme-stats.vercel.app/api/top-langs/?username=jbouhadoun&layout=compact&langs_count=7&theme=tokyonight"/>
+          </div>
+
+          <div align="center">
+            <img src="https://github-readme-streak-stats.herokuapp.com/?user=jbouhadoun&theme=tokyonight" alt="GitHub Streak"/>
+          </div>
+
+          ## 🚀 Technologies & Langages
+
+          ### Mes Langages de Programmation (Détectés Automatiquement)
+          ${{ steps.languages.outputs.LANGUAGE_BADGES }}
+
+          ### Frameworks & Outils Favoris
+          ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+          ![Vue.js](https://img.shields.io/badge/Vue.js-35495E?style=for-the-badge&logo=vue.js&logoColor=4FC08D)
+          ![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+          ![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
+          ![Express.js](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge)
+          ![Spring](https://img.shields.io/badge/Spring-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
+          ![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white)
+
+          ### Bases de Données
+          ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
+          ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+          ![MySQL](https://img.shields.io/badge/MySQL-00000F?style=for-the-badge&logo=mysql&logoColor=white)
+          ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+
+          ### Cloud & DevOps
+          ![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)
+          ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+          ![Kubernetes](https://img.shields.io/badge/Kubernetes-326ce5?style=for-the-badge&logo=kubernetes&logoColor=white)
+          ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
+
+          ### Outils de Développement
+          ![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
+          ![VS Code](https://img.shields.io/badge/VS_Code-0078d4?style=for-the-badge&logo=visual-studio-code&logoColor=white)
+          ![IntelliJ](https://img.shields.io/badge/IntelliJ_IDEA-000000?style=for-the-badge&logo=intellij-idea&logoColor=white)
+
+          ## 📈 Contribution Graph
+
+          <div align="center">
+            <img src="https://github-readme-activity-graph.vercel.app/graph?username=jbouhadoun&theme=tokyo-night&bg_color=1a1b27&color=9745f5&line=9745f5&point=403d3d&area_color=FFFFFF&title_color=FFFFFF&area=true" alt="Contribution Graph" />
+          </div>
+
+          ## 🐍 Snake Game (mes contributions)
+
+          <div align="center">
+            <picture>
+              <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jbouhadoun/jbouhadoun/output/github-contribution-grid-snake-dark.svg">
+              <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/jbouhadoun/jbouhadoun/output/github-contribution-grid-snake.svg">
+              <img alt="github contribution grid snake animation" src="https://raw.githubusercontent.com/jbouhadoun/jbouhadoun/output/github-contribution-grid-snake.svg">
+            </picture>
+          </div>
+
+          ## 🏆 Trophées GitHub
+
+          <div align="center">
+            <img src="https://github-profile-trophy.vercel.app/?username=jbouhadoun&theme=tokyonight&no-frame=false&no-bg=false&margin-w=4" alt="GitHub Trophies"/>
+          </div>
+
+          ## 📊 Statistiques Détaillées
+
+          <div align="center">
+            <img src="https://github-profile-summary-cards.vercel.app/api/cards/profile-details?username=jbouhadoun&theme=tokyonight" alt="Profile Summary"/>
+          </div>
+
+          <div align="center">
+            <img src="https://github-profile-summary-cards.vercel.app/api/cards/repos-per-language?username=jbouhadoun&theme=tokyonight" alt="Repos per Language"/>
+            <img src="https://github-profile-summary-cards.vercel.app/api/cards/most-commit-language?username=jbouhadoun&theme=tokyonight" alt="Most Commit Language"/>
+          </div>
+
+          <div align="center">
+            <img src="https://github-profile-summary-cards.vercel.app/api/cards/stats?username=jbouhadoun&theme=tokyonight" alt="Stats"/>
+            <img src="https://github-profile-summary-cards.vercel.app/api/cards/productive-time?username=jbouhadoun&theme=tokyonight&utcOffset=1" alt="Productive Time"/>
+          </div>
+
+          ## 💼 Projets Récents
+
+          <div align="center">
+            <a href="https://github.com/jbouhadoun/awesome-project-1">
+              <img align="center" src="https://github-readme-stats.vercel.app/api/pin/?username=jbouhadoun&repo=awesome-project-1&theme=tokyonight" />
+            </a>
+            <a href="https://github.com/jbouhadoun/awesome-project-2">
+              <img align="center" src="https://github-readme-stats.vercel.app/api/pin/?username=jbouhadoun&repo=awesome-project-2&theme=tokyonight" />
+            </a>
+          </div>
+
+          ## 📫 Comment me contacter
+
+          <div align="center">
+            <a href="mailto:votre.email@example.com">
+              <img src="https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Email"/>
+            </a>
+            <a href="https://linkedin.com/in/votre-profil">
+              <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn"/>
+            </a>
+            <a href="https://twitter.com/votre-handle">
+              <img src="https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white" alt="Twitter"/>
+            </a>
+          </div>
+
+          ## 💰 Support
+
+          <div align="center">
+            <a href="https://ko-fi.com/jbouhadoun">
+              <img src="https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi"/>
+            </a>
+            <a href="https://paypal.me/jbouhadoun">
+              <img src="https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="PayPal"/>
+            </a>
+          </div>
+
+          ---
+
+          <div align="center">
+            <img src="https://komarev.com/ghpvc/?username=jbouhadoun&label=Visites%20du%20profil&color=0e75b6&style=flat" alt="Profile Views"/>
+          </div>
+
+          <div align="center">
+            <p>⭐️ N'hésitez pas à starred mes repos si vous les trouvez intéressants !</p>
+          </div>
+          EOF
+
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git diff --staged --quiet || git commit -m "🤖 Mise à jour automatique du profil GitHub"
+          git push
