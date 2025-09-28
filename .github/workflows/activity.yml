@@ -1,4 +1,3 @@
-name: Update GitHub Profile
 on:
   push:
     branches: [ main ]
@@ -12,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,11 +23,8 @@ jobs:
           outputs: |
             dist/github-contribution-grid-snake.svg
             dist/github-contribution-grid-snake-dark.svg?palette=github-dark
-            
-      - name: Generate GitHub Stats
-        uses: anuraghazra/github-readme-stats@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Get GitHub Languages and Frameworks
         id: languages
@@ -311,9 +308,9 @@ jobs:
 
           <div align="center">
             <picture>
-              <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jbouhadoun/jbouhadoun/output/github-contribution-grid-snake-dark.svg">
-              <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/jbouhadoun/jbouhadoun/output/github-contribution-grid-snake.svg">
-              <img alt="github contribution grid snake animation" src="https://raw.githubusercontent.com/jbouhadoun/jbouhadoun/output/github-contribution-grid-snake.svg">
+              <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jbouhadoun/jbouhadoun/main/dist/github-contribution-grid-snake-dark.svg">
+              <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/jbouhadoun/jbouhadoun/main/dist/github-contribution-grid-snake.svg">
+              <img alt="github contribution grid snake animation" src="https://raw.githubusercontent.com/jbouhadoun/jbouhadoun/main/dist/github-contribution-grid-snake.svg">
             </picture>
           </div>
 
@@ -392,4 +389,3 @@ jobs:
           git config --local user.name "GitHub Action"
           git add .
           git diff --staged --quiet || git commit -m "🤖 Mise à jour automatique du profil GitHub"
-          git push
