@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>👋 Salut, je suis Jugurtha Bouhadoun</h1>
+  <h1>👋 Salut, je suis Julien Bouhadoun</h1>
   <p>
     <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&pause=1000&color=2E9EF7&center=true&vCenter=true&width=435&lines=D%C3%A9veloppeur+Full+Stack;Passionn%C3%A9+par+la+technologie;Toujours+en+apprentissage" alt="Typing SVG" />
   </p>
