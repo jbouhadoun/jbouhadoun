@@ -15,38 +15,75 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         
-      - name: Get recent activity
+      - name: Get contributions and activity
         id: activity
         run: |
-          # Récupérer les langages
+          # Récupérer les langages principaux
           languages=$(curl -s "https://api.github.com/users/jbouhadoun/repos" | \
             jq -r '.[].language | select(. != null)' | \
-            sort | uniq -c | sort -rn | head -5 | awk '{print $2}')
+            sort | uniq -c | sort -rn | head -6 | awk '{print $2}')
           
-          # Récupérer les derniers commits
-          recent_commits=$(curl -s "https://api.github.com/users/jbouhadoun/events" | \
-            jq -r '.[] | select(.type == "PushEvent") | .repo.name' | head -3 | sort -u)
+          # Récupérer les repos avec activité récente
+          recent_repos=$(curl -s "https://api.github.com/users/jbouhadoun/repos?sort=updated&per_page=5" | \
+            jq -r '.[] | select(.updated_at > (now - 30*24*3600 | strftime("%Y-%m-%dT%H:%M:%SZ"))) | 
+            "[\(.name)](\(.html_url)) - \(.description // "Projet en cours")"')
           
           # Récupérer les dernières pull requests
-          recent_prs=$(curl -s "https://api.github.com/search/issues?q=author:jbouhadoun+type:pr&sort=updated&per_page=3" | \
-            jq -r '.items[] | "\(.repository_url | split("/")[-1]): \(.title)"')
+          recent_prs=$(curl -s "https://api.github.com/search/issues?q=author:jbouhadoun+type:pr+is:merged&sort=updated&per_page=4" | \
+            jq -r '.items[] | "- **\(.repository_url | split("/")[-1])**: \(.title | .[0:60])\(if (.title | length) > 60 then "..." else "" end)"')
           
-          # Créer des badges simples pour les langages
-          lang_badges=""
-          for lang in $languages; do
-            case $lang in
-              "JavaScript") lang_badges="$lang_badges ![JS](https://img.shields.io/badge/-JavaScript-yellow)" ;;
-              "TypeScript") lang_badges="$lang_badges ![TS](https://img.shields.io/badge/-TypeScript-blue)" ;;
-              "Python") lang_badges="$lang_badges ![Python](https://img.shields.io/badge/-Python-green)" ;;
-              "Java") lang_badges="$lang_badges ![Java](https://img.shields.io/badge/-Java-orange)" ;;
-              "React") lang_badges="$lang_badges ![React](https://img.shields.io/badge/-React-blue)" ;;
-              *) lang_badges="$lang_badges ![${lang}](https://img.shields.io/badge/-${lang}-lightgrey)" ;;
+          # Détection frameworks depuis repos actifs
+          frameworks=""
+          active_repos=$(curl -s "https://api.github.com/users/jbouhadoun/repos?sort=updated&per_page=10" | jq -r '.[].name')
+          
+          for repo in $active_repos; do
+            package_json=$(curl -s "https://api.github.com/repos/jbouhadoun/$repo/contents/package.json" 2>/dev/null)
+            if echo "$package_json" | jq -e '.content' > /dev/null 2>&1; then
+              content=$(echo "$package_json" | jq -r '.content' | base64 -d 2>/dev/null)
+              if [ $? -eq 0 ]; then
+                deps=$(echo "$content" | jq -r '.dependencies // {}, .devDependencies // {} | keys[]' 2>/dev/null)
+                echo "$deps" | while read dep; do
+                  case "$dep" in
+                    "react") echo "React" ;;
+                    "next") echo "Next.js" ;;
+                    "vue") echo "Vue.js" ;;
+                    "express") echo "Express.js" ;;
+                    "@nestjs/core") echo "NestJS" ;;
+                    "fastify") echo "Fastify" ;;
+                  esac
+                done
+              fi
+            fi
+          done | sort | uniq > frameworks_temp.txt
+          
+          frameworks=$(cat frameworks_temp.txt | tr '\n' ' ')
+          
+          # Créer badges pour langages + frameworks détectés
+          all_tech="$languages $frameworks"
+          tech_badges=""
+          for tech in $all_tech; do
+            case $tech in
+              "JavaScript") tech_badges="$tech_badges![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black) " ;;
+              "TypeScript") tech_badges="$tech_badges![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white) " ;;
+              "Python") tech_badges="$tech_badges![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) " ;;
+              "Java") tech_badges="$tech_badges![Java](https://img.shields.io/badge/Java-ED8B00?style=flat&logo=java&logoColor=white) " ;;
+              "React") tech_badges="$tech_badges![React](https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black) " ;;
+              "Next.js") tech_badges="$tech_badges![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat&logo=nextdotjs&logoColor=white) " ;;
+              "Vue.js") tech_badges="$tech_badges![Vue.js](https://img.shields.io/badge/Vue.js-4FC08D?style=flat&logo=vue.js&logoColor=white) " ;;
+              "Express.js") tech_badges="$tech_badges![Express](https://img.shields.io/badge/Express-000000?style=flat&logo=express&logoColor=white) " ;;
+              "NestJS") tech_badges="$tech_badges![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=flat&logo=nestjs&logoColor=white) " ;;
+              "C++") tech_badges="$tech_badges![C++](https://img.shields.io/badge/C++-00599C?style=flat&logo=cplusplus&logoColor=white) " ;;
+              "PHP") tech_badges="$tech_badges![PHP](https://img.shields.io/badge/PHP-777BB4?style=flat&logo=php&logoColor=white) " ;;
+              "Go") tech_badges="$tech_badges![Go](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go&logoColor=white) " ;;
+              *) tech_badges="$tech_badges![${tech}](https://img.shields.io/badge/${tech}-grey?style=flat) " ;;
             esac
           done
           
-          echo "LANG_BADGES=$lang_badges" >> $GITHUB_OUTPUT
-          echo "RECENT_COMMITS<<EOF" >> $GITHUB_OUTPUT
-          echo "$recent_commits" >> $GITHUB_OUTPUT
+          rm -f frameworks_temp.txt
+          
+          echo "TECH_BADGES=$tech_badges" >> $GITHUB_OUTPUT
+          echo "RECENT_REPOS<<EOF" >> $GITHUB_OUTPUT
+          echo "$recent_repos" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           echo "RECENT_PRS<<EOF" >> $GITHUB_OUTPUT
           echo "$recent_prs" >> $GITHUB_OUTPUT
@@ -55,36 +92,35 @@ jobs:
       - name: Update README
         run: |
           cat > README.md << 'EOF'
-          # Salut 👋
+          # Hey ! 👋
           
-          Je suis Jugurtha
+          Passionné de tech, je développe des projets qui ont du sens.
           
-          ## Ce que j'utilise actuellement
-          ${{ steps.activity.outputs.LANG_BADGES }}
+          ## Stack technique
+          ${{ steps.activity.outputs.TECH_BADGES }}
           
-          ## Mes stats
-          ![Stats](https://github-readme-stats.vercel.app/api?username=jbouhadoun&show_icons=true&theme=default)
+          ## Statistiques
+          <div>
+            <img height="180em" src="https://github-readme-stats.vercel.app/api?username=jbouhadoun&show_icons=true&theme=default&include_all_commits=true"/>
+            <img height="180em" src="https://github-readme-stats.vercel.app/api/top-langs/?username=jbouhadoun&layout=compact&theme=default"/>
+          </div>
           
-          ## Dernière activité
+          ## Projets récents
+          ${{ steps.activity.outputs.RECENT_REPOS }}
           
-          **Repos récents:**
-          ${{ steps.activity.outputs.RECENT_COMMITS }}
-          
-          **Dernières PRs:**
+          ## Dernières contributions
           ${{ steps.activity.outputs.RECENT_PRS }}
           
           ## Contact
-          - 📧 [Email](mailto:votre.email@example.com)
-          - 💼 [LinkedIn](https://linkedin.com/in/votre-profil)
-          
+          - 📧 [Email](jbouahdoun@gmail.com)          
           ---
-          *Dernière mise à jour automatique*
+          <sub>Mis à jour automatiquement</sub>
           EOF
 
-      - name: Commit
+      - name: Commit and push
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add README.md
-          git diff --staged --quiet || git commit -m "Update profile"
+          git diff --staged --quiet || git commit -m "📊 Update profile stats"
           git push
